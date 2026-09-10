@@ -1,0 +1,46 @@
+import serial
+import time
+
+# --- Configuration ---
+COM_PORT = 'COM6'      # Update this to match your FTDI COM port in Device Manager
+BAUD_RATE = 115200     # Update this to match your FPGA UART receiver's baud rate
+
+def test_fpga_uart_tx_only():
+    try:
+        # Initialize serial connection with 8 data bits and ODD parity
+        ser = serial.Serial(
+            port=COM_PORT,
+            baudrate=BAUD_RATE,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_ODD,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=1
+        )
+
+        if ser.is_open:
+            print(f"Successfully opened {COM_PORT} at {BAUD_RATE} baud (8O1 configuration).")
+
+            # Data to send. 
+            # 0x55 (01010101) and 0xAA (10101010) are standard test bytes for UART debugging.
+            test_data = b'\x8C\xFF\x11\x12' 
+            ''
+            
+            # Write data to the FTDI chip
+            bytes_written = ser.write(test_data)
+            
+            # Ensure the data is physically transmitted out of the buffer before proceeding
+            ser.flush()
+            
+            print(f"Successfully transmitted {bytes_written} bytes: {test_data}")
+
+    except serial.SerialException as e:
+        print(f"Serial Port Error: {e}")
+        print("Check if the port is correct and not open in another program.")
+    
+    finally:
+        if 'ser' in locals() and ser.is_open:
+            ser.close()
+            print("Port closed.")
+
+if __name__ == '__main__':
+    test_fpga_uart_tx_only()
