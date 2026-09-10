@@ -1,0 +1,116 @@
+`timescale 1ns/1ps
+//`include "uart_rx.v"
+
+module tb_uart #(
+    parameter BAUD = 115200,
+    parameter WORD_LENGTH = 8
+)();
+
+    reg clk=0;
+    reg rst;
+    reg baud_clk=0;
+    reg UART_RX;
+
+    wire [WORD_LENGTH-1:0] data_out;
+    wire data_valid;
+
+    //instantiate
+    uart_rx dut(
+        .clk(clk),
+        .rst(rst),
+        .UART_RX(UART_RX),
+        .rx_data(data_out),
+        .rx_data_valid(data_valid)
+    );
+
+    // System Clock 50M
+    always begin
+       #10 clk = ~clk; 
+    end
+
+    // Baud Clock 
+    always begin
+        #( (1e9 / BAUD) / 2.0 ) baud_clk = ~baud_clk; 
+    end
+
+    // drive tx
+    task drive_tx(input [WORD_LENGTH-1:0] tx_data);
+        integer i;
+        begin
+            // start
+            @(posedge baud_clk);
+            UART_RX = 1'b0;
+            
+            // data
+            for (i = 0; i < WORD_LENGTH; i = i + 1) begin
+                @(posedge baud_clk);
+                UART_RX = tx_data[i];
+            end
+            
+            // stop
+            @(posedge baud_clk);
+            UART_RX = 1'b1;
+        end
+    endtask
+
+    // idle holds at high;
+    task idle(input integer cycles);
+        integer i;
+        begin
+            for (i = 0; i < cycles; i = i + 1) begin
+                @(posedge baud_clk);
+                UART_RX = 1'b1;
+            end
+        end
+    endtask
+
+    // test sequence
+    initial begin
+        // waveform vcd
+        $dumpfile("tb_uart.vcd");
+        $dumpvars(0, tb_uart);
+
+        // init
+        //clk = 0;
+        //baud_clk = 0;
+        UART_RX = 1'b1; 
+        rst = 1'b1;
+
+        #(100)
+        rst = 1'b0;
+        idle(5);
+
+    
+        // 8'hA5 (10100101)
+        $display("[%0t] Starting Test Case 1: Transmitting 8'hA5", $time);
+        drive_tx(8'hA5);
+        
+        // data vaalid period
+        wait(data_valid);
+        if (data_out == 8'hA5) 
+            $display("[%0t] PASSED: Received 8'h%h", $time, data_out);
+        else 
+            $display("[%0t] FAILED: Expected 8'hA5, Got 8'h%h", $time, data_out);
+        wait(!data_valid);
+
+
+        idle(3);
+
+       
+        // 8'h3C (00111100)
+        $display("[%0t] Starting Test Case 2: Transmitting 8'h3C", $time);
+        drive_tx(8'h3C);
+        
+        wait(data_valid);
+        if (data_out == 8'h3C) 
+            $display("[%0t] PASSED: Received 8'h%h", $time, data_out);
+        else 
+            $display("[%0t] FAILED: Expected 8'h3C, Got 8'h%h", $time, data_out);
+
+        //finish
+        idle(5);
+        $display("[%0t] Simulation Complete.", $time);
+        $finish;
+    end
+
+endmodule
